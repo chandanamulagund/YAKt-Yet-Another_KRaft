@@ -67,38 +67,123 @@ KRaft is a protocol and feature set introduced in the realm of distributed syste
     KRaft handles node failures gracefully, maintaining cluster operation with leader election and ensuring uninterrupted data consistency.
 
 
+## Project Structure
+
+| File / Directory | Purpose |
+|---|---|
+| `flask_http_server.py` | Main entry point — Flask HTTP server exposing the KRaft metadata API; owns the Raft node lifecycle |
+| `raft/raft.py` | Core Raft consensus node (leader election, log replication, heartbeats) over ZeroMQ PUB/SUB |
+| `raft/protocol.py` | Raft message types (`RequestVote`, `AppendEntries`, `ClientRequest`, etc.) with JSON serialisation |
+| `raft/interface.py` | ZeroMQ transport — `Talker` (publisher) and `Listener` (subscriber) as separate processes |
+| `raft/__init__.py` | Exports `RaftNode` |
+| `client/client_1.py` | Register a broker record |
+| `client/client_2.py` | Create a topic record |
+| `client/client_3.py` | Create a partition record |
+| `client/client_4.py` | Register a producer ID record |
+| `client/client_broker_mgmt.py` | Broker management heartbeat (fetch metadata diff since offset) |
+| `client/client_client_mgmt.py` | Client management fetch (topics/partitions/brokers since offset) |
+| `client/client_remove.py` | Remove a Raft node from the cluster |
+| `client/new_node_client.py` | Add a new Raft node to the running cluster |
+
 ## Getting Started
-
-1. client.py: A client script for sending JSON data to the Flask server. It uses the requests library to make HTTP requests to a specified URL.
-
-2. flask_http_server.py: A Flask server that handles HTTP requests and maintains an in-memory data structure (metadata_store) for storing records.
-
-3. http_server.py: A simple HTTP server using Python's built-in http.server module. It serves content on a specified port.
-
-4. modified_raft.py: An extension or modification of a Raft consensus algorithm implementation. It includes classes and functions related to the Raft protocol, likely used for managing distributed consensus and metadata consistency.
-
-5. start.py: This script initializes a Raft node with basic configurations such as node ID, number of nodes, and election timeouts. It may serve as an entry point to start a node in the YAKt system.
-
-6. init.py: A standard Python initializer script, possibly used for package initialization. It references RaftNode from raft.py, indicating the use of Raft nodes in the project.
-
-7. interface.py: This file includes definitions related to network communication, such as a Talker class, likely used for inter-node communication within the Raft cluster.
-
-8. protocol.py: Defines various message types and directions, along with results related to Raft protocol messages like vote requests and responses.
 
 ### Prerequisites
 
-- List any software or tools users need to install before using your project.
+- **Python 3.12** (tested on 3.12.9)
+- **pyenv** (recommended) or any Python 3.12 environment manager
+- **pyzmq** requires libzmq — on macOS install via Homebrew: `brew install zeromq`
 
 ### Installation
 
-Provide step-by-step instructions on how to install your project.
+```bash
+# 1. Clone the repo
+git clone https://github.com/chandanamulagund/YAKt-Yet-Another_KRaft.git
+cd YAKt-Yet-Another_KRaft
 
-## Usage
+# 2. Create and activate a pyenv virtualenv
+pyenv virtualenv 3.12.9 yakt-env
+pyenv local yakt-env
 
-Show examples of how to use your project. Provide code snippets and highlight important features.
+# 3. Install dependencies
+pip install --upgrade pip
+pip install "flask>=3.1,<4" "pyzmq>=26,<28" "requests>=2.32,<3" "future>=1.0,<2"
+```
+
+### Running the server
+
+```bash
+# Start the Flask server (runs on localhost:5000)
+python flask_http_server.py
+```
+
+In a separate terminal, bootstrap the Raft cluster by hitting the root route once:
+
+```bash
+curl http://localhost:5000/
+```
+
+This starts 4 Raft nodes (node0–node3) bound to `127.0.0.1` on ports 5564–5567, runs an initial leader election, and returns `before_first_request` when the bootstrap is complete.
+
+### Running the clients
+
+With the server running, open another terminal (with `yakt-env` active) and run each client:
+
+```bash
+# Register a broker
+python client/client_1.py
+
+# Create a topic
+python client/client_2.py
+
+# Create a partition
+python client/client_3.py
+
+# Register a producer ID
+python client/client_4.py
+
+# Broker management heartbeat (fetch metadata diff since a given offset)
+python client/client_broker_mgmt.py
+
+# Client management fetch (topics, partitions, broker info since offset)
+python client/client_client_mgmt.py
+```
+
+### API endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/register-broker-record` | Register a broker |
+| `GET` | `/api/register-broker-record` | List all active brokers |
+| `GET` | `/api/register-broker-record/<id>` | Get broker by ID |
+| `POST` | `/api/topic-record` | Create a topic |
+| `GET` | `/api/topic-record/<name>` | Get topic by name |
+| `POST` | `/api/partition-record` | Create a partition |
+| `POST` | `/api/producer-id-record` | Register a producer ID |
+| `POST` | `/api/broker-registration-change` | Update broker info |
+| `DELETE` | `/api/register-broker-record/<id>` | Unregister a broker |
+| `POST` | `/api/broker-mgmt` | Broker heartbeat — returns metadata diff since offset |
+| `POST` | `/api/client-mgmt` | Client fetch — returns topics/partitions/brokers since offset |
+| `POST` | `/api/new_node` | Add a Raft node to the running cluster |
+| `POST` | `/api/remove_node` | Remove a Raft node from the running cluster |
+| `GET` | `/api/get-records-from-nodes` | Inspect the last committed log entry of a named node |
+
+### Known issues in the current baseline
+
+> Full details with exact error output and root causes are tracked in [`bugs.md`](bugs.md).
+
+| Bug | Description | Fixed in |
+|-----|-------------|----------|
+| BUG-001 | Raft election livelock — nodes loop as candidates, no leader elected | Phase 1 |
+| BUG-002 | HTTP API bypasses Raft entirely; returns 200 while silently not replicating | Phase 1 + 2 |
+| BUG-003 | Flask `debug=True` reloader forks process; Raft nodes start in wrong process → `IndexError` | Phase 0 workaround (`FLASK_DEBUG=0`) / Phase 3 proper fix |
+| BUG-004 | Hardcoded LAN IP `192.168.136.128` in server and clients | Phase 0 |
+| BUG-005 | `node_records()` crashes with `UnboundLocalError` on unknown node name | Phase 3 |
+| BUG-006 | Python 2 compat shims (`future`/`past`) imported unnecessarily on Python 3.12 | Phase 0 |
 
 ## License
 
-
-
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+*Originally developed as a Big Data course project (UE21CS343AB2) at PES University. Modernised and extended by [Chandana S M](https://github.com/chandanamulagund).*

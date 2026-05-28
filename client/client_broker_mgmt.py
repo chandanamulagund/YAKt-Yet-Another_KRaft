@@ -1,8 +1,9 @@
 import requests
 import json
+from constants import BASE_URL
 
 # Set the URL of your Flask server
-url = 'http://localhost:5000/api/broker-mgmt'  # Replace with your actual endpoint
+url = f'{BASE_URL}/api/broker-mgmt'
 
 
 # Data to be sent in JSON format
