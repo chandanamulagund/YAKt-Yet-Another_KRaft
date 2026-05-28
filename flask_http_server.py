@@ -12,7 +12,7 @@ logging.basicConfig(filename='app.log', level=logging.DEBUG,
 app = Flask(__name__)
  
 # Create the intercommunication json 
-ip_addr = "192.168.136.128"
+ip_addr = "127.0.0.1"
 comm_dict = {"node0": {"ip": ip_addr, "port": "5567"}, 
             "node1": {"ip": ip_addr, "port": "5566"}, 
             "node2": {"ip": ip_addr, "port": "5565"},

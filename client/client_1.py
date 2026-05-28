@@ -1,14 +1,15 @@
 import requests
 import json
+from constants import BROKER_HOST, BASE_URL
 
 # Set the URL of your Flask server
-url = 'http://localhost:5000/api/register-broker-record'  # Replace with your actual endpoint
+url = f'{BASE_URL}/api/register-broker-record'
 
 # Data to be sent in JSON format
 data = {
   "internalUUID": 0,
   "brokerId": 0,
-  "brokerHost": "192.168.136.128",
+  "brokerHost":BROKER_HOST,
   "brokerPort": "9092",
   "securityProtocol": "https",
   "brokerStatus": "INIT",

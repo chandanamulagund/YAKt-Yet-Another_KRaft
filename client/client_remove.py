@@ -1,13 +1,13 @@
 import requests
 import json
+from constants import BROKER_HOST, BASE_URL
 
 # Set the URL of your Flask server
-url = 'http://localhost:5000/api/remove_node'  # Replace with your actual endpoint
+url = f'{BASE_URL}/api/remove_node'
 
 # Data to be sent in JSON format
-ip_addr = "192.168.136.128"
 data = {
-    "node1": {"ip": ip_addr, "port": "5566"}}
+    "node1": {"ip": BROKER_HOST, "port": "5566"}}
 
 # Set the headers to indicate that we're sending JSON
 headers = {'Content-Type': 'application/json'}
